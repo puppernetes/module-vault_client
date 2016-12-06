@@ -1,0 +1,6 @@
+test:
+  script:
+  - bundle install --path /cache
+  - bundle exec rake test
+  tags:
+  - ruby-2.3
