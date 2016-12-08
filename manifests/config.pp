@@ -144,6 +144,12 @@ class vault_client::config {
       refreshonly => true,
     }
 
+    service { 'k8s-kubelet-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/k8s-kubelet-cert.timer'], Exec['In dev mode get CA for k8s'] ],
+    }
+
     vault_client::k8s_cert_service { 'kube_proxy':
       k8s_component => 'kube-proxy',
       frequency     => '1d',
@@ -157,7 +163,73 @@ class vault_client::config {
       user        => 'root',
       refreshonly => true,
     }
+
+    service { 'k8s-kube-proxy-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/k8s-kube-proxy-cert.timer'], Exec['In dev mode get CA for k8s'] ],
+    }
   }
 
+  if $vault_client::role == 'master' {
+    vault_client::k8s_cert_service { 'kube_apiserver':
+      k8s_component => 'kube-apiserver',
+      frequency     => '1d',
+      role          => $vault_client::role,
+      notify        => Exec['Trigger k8s kube apiserver cert'],
+      require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
+    }
 
+    exec { 'Trigger k8s kube apiserver cert':
+      command     => '/usr/bin/systemctl start k8s-kube-apiserver-cert.service',
+      user        => 'root',
+      refreshonly => true,
+    }
+
+    service { 'k8s-kube-apiserver-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/k8s-kube-apiserver-cert.timer'], Exec['In dev mode get CA for k8s'] ],
+    }
+
+    vault_client::k8s_cert_service { 'kube_scheduler':
+      k8s_component => 'kube-scheduler',
+      frequency     => '1d',
+      role          => $vault_client::role,
+      notify        => Exec['Trigger k8s kube scheduler cert'],
+      require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
+    }
+
+    exec { 'Trigger k8s kube scheduler cert':
+      command     => '/usr/bin/systemctl start k8s-kube-scheduler-cert.service',
+      user        => 'root',
+      refreshonly => true,
+    }
+
+    service { 'k8s-kube-scheduler-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/k8s-kube-scheduler-cert.timer'], Exec['In dev mode get CA for k8s'] ],
+    }
+
+    vault_client::k8s_cert_service { 'kube_controller_manager':
+      k8s_component => 'kube-controller-manager',
+      frequency     => '1d',
+      role          => $vault_client::role,
+      notify        => Exec['Trigger k8s kube controller manager cert'],
+      require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
+    }
+
+    exec { 'Trigger k8s kube controller manager cert':
+      command     => '/usr/bin/systemctl start k8s-kube-controller-manager-cert.service',
+      user        => 'root',
+      refreshonly => true,
+    }
+
+    service { 'k8s-kube-controller-manager-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/k8s-kube-controller-manager-cert.timer'], Exec['In dev mode get CA for k8s'] ],
+    }
+  }
 }
