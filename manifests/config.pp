@@ -96,6 +96,12 @@ class vault_client::config {
     require => File['/etc/etcd/ssl/certs'],
   }
 
+  exec { 'In dev mode get CA for k8s':
+    command => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca > /etc/kubernetes/ssl/certs/k8s.pem'",
+    unless  => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca | diff -P /etc/kubernetes/ssl/certs/k8s.pem -'",
+    require => File['/etc/kubernetes/ssl/certs'],
+  }
+
   #not used for now
   exec { 'update CA trust':
     command     => '/usr/bin/update-ca-trust',
@@ -123,19 +129,35 @@ class vault_client::config {
     require => File['/usr/lib/systemd/system/etcd-overlay-cert.service'],
   }
 
-  if $vault_client::role == 'worker' {
+  if $vault_client::role == 'worker' or $vault_client::role == 'master' {
     vault_client::k8s_cert_service { 'kubelet':
       k8s_component => 'kubelet',
       frequency     => '1d',
       role          => $vault_client::role,
-      notify        => Exec['Trigger kubelet cert'],
+      notify        => Exec['Trigger k8s kubelet cert'],
       require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
     }
 
-    exec { 'Trigger kubelet cert':
+    exec { 'Trigger k8s kubelet cert':
       command     => '/usr/bin/systemctl start k8s-kubelet-cert.service',
       user        => 'root',
       refreshonly => true,
     }
+
+    vault_client::k8s_cert_service { 'proxy':
+      k8s_component => 'proxy',
+      frequency     => '1d',
+      role          => $vault_client::role,
+      notify        => Exec['Trigger k8s proxy cert'],
+      require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
+    }
+
+    exec { 'Trigger k8s proxy cert':
+      command     => '/usr/bin/systemctl start k8s-proxy-cert.service',
+      user        => 'root',
+      refreshonly => true,
+    }
   }
+
+
 }
