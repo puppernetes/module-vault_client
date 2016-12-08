@@ -106,7 +106,7 @@ class vault_client::config {
     etcd_cluster => 'overlay',
     frequency    => '1d',
     role         => $vault_client::role,
-    notify       => Exec['Trigger overlay cert'],
+    notify       => Exec['Trigger etcd overlay cert'],
     require      => [ File['/etc/etcd/ssl'], User['etcd user for vault'] ],
   }
 
