@@ -4,7 +4,7 @@ Description=remint etcd-<%= @etcd_cluster %> certs daily and on boot
 [Timer]
 OnBootSec=1min
 OnUnitActiveSec=<%= @frequency %>
-RandomizedDelaySec=300
+#########RandomizedDelaySec=300
 
 [Install]
 WantedBy=timers.target
