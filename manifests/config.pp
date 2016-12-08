@@ -47,7 +47,7 @@ class vault_client::config {
       etcd_cluster => 'k8s',
       frequency    => '1d',
       role         => $vault_client::role,
-      notify       => Exec['Trigger k8s cert'],
+      notify       => Exec['Trigger etcd k8s cert'],
       require      => [ File['/etc/etcd/ssl'], User['etcd user for vault'] ],
     }
 
@@ -56,12 +56,38 @@ class vault_client::config {
       enable   => true,
       require  => [ File['/usr/lib/systemd/system/etcd-k8s-cert.timer'], Exec['In dev mode get CA for k8s'] ],
     }
+
+    exec { 'Trigger etcd k8s cert':
+      command => '/usr/bin/systemctl start etcd-k8s-cert.service',
+      user    => 'root',
+      unless  => '/usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-k8s-cert.pem | /usr/bin/grep "Certificate will not expire"',
   }
 
-  exec { 'Trigger k8s cert':
-    command => '/usr/bin/systemctl start etcd-k8s-cert.service',
-    user    => 'root',
-    unless  => '/usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-k8s-cert.pem | /usr/bin/grep "Certificate will not expire"',
+    exec { 'In dev mode get CA for events':
+      command => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/etcd-events/cert/ca > /etc/etcd/ssl/certs/etcd-events.pem'",
+      unless  => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/etcd-events/cert/ca | diff -P /etc/etcd/ssl/certs/etcd-events.pem -'",
+      require => File['/etc/etcd/ssl/certs'],
+    }
+
+    vault_client::etcd_cert_service { 'events':
+      etcd_cluster => 'events',
+      frequency    => '1d',
+      role         => $vault_client::role,
+      notify       => Exec['Trigger etcd events cert'],
+      require      => [ File['/etc/etcd/ssl'], User['etcd user for vault'] ],
+    }
+
+    service { 'etcd-k8s-cert.timer':
+      provider => systemd,
+      enable   => true,
+      require  => [ File['/usr/lib/systemd/system/etcd-events-cert.timer'], Exec['In dev mode get CA for events'] ],
+    }
+
+    exec { 'Trigger etcd events cert':
+      command => '/usr/bin/systemctl start etcd-events-cert.service',
+      user    => 'root',
+      unless  => '/usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-events-cert.pem | /usr/bin/grep "Certificate will not expire"',
+    }
   }
 
   exec { 'In dev mode get CA for overlay':
@@ -90,19 +116,12 @@ class vault_client::config {
     require  => [ File['/usr/lib/systemd/system/etcd-overlay-cert.timer'], Exec['In dev mode get CA for overlay'] ],
   }
 
-  exec { 'Trigger overlay cert':
+  exec { 'Trigger etcd overlay cert':
     command => '/usr/bin/systemctl start etcd-overlay-cert.service',
     user    => 'root',
-    unless  => '/usr/bin/stat /etc/etcd/ssl/certs/etcd-overlay-cert.pem || /usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-overlay-cert.pem | /usr/bin/grep "Certificate will not expire"',
+    unless  => '/usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-overlay-cert.pem | /usr/bin/grep "Certificate will not expire"',
     require => File['/usr/lib/systemd/system/etcd-overlay-cert.service'],
   }
-
-  exec { 'Trigger events cert':
-    command => '/usr/bin/systemctl start etcd-events-cert.service',
-    user    => 'root',
-    unless  => '/usr/bin/openssl x509 -checkend 3600 -in /etc/etcd/ssl/certs/etcd-events-cert.pem | /usr/bin/grep "Certificate will not expire"',
-  }
-
 
   if $vault_client::role == 'worker' {
     vault_client::k8s_cert_service { 'kubelet':
