@@ -77,7 +77,7 @@ class vault_client::config {
       require      => [ File['/etc/etcd/ssl'], User['etcd user for vault'] ],
     }
 
-    service { 'etcd-k8s-cert.timer':
+    service { 'etcd-events-cert.timer':
       provider => systemd,
       enable   => true,
       require  => [ File['/usr/lib/systemd/system/etcd-events-cert.timer'], Exec['In dev mode get CA for events'] ],
