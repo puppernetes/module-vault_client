@@ -144,16 +144,16 @@ class vault_client::config {
       refreshonly => true,
     }
 
-    vault_client::k8s_cert_service { 'proxy':
-      k8s_component => 'proxy',
+    vault_client::k8s_cert_service { 'kube_proxy':
+      k8s_component => 'kube-proxy',
       frequency     => '1d',
       role          => $vault_client::role,
-      notify        => Exec['Trigger k8s proxy cert'],
+      notify        => Exec['Trigger k8s kube proxy cert'],
       require       => [ File['/etc/kubernetes/ssl'], User['k8s user for vault'] ],
     }
 
-    exec { 'Trigger k8s proxy cert':
-      command     => '/usr/bin/systemctl start k8s-proxy-cert.service',
+    exec { 'Trigger k8s kube proxy cert':
+      command     => '/usr/bin/systemctl start k8s-kube-proxy-cert.service',
       user        => 'root',
       refreshonly => true,
     }
