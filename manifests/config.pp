@@ -37,7 +37,7 @@ class vault_client::config {
   }
 
   if $vault_client::role == 'master' or $vault_client::role == 'etcd' {
-    exec { 'In dev mode get CA for k8s':
+    exec { 'In dev mode get CA for etcd k8s':
       command => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/etcd-k8s/cert/ca > /etc/etcd/ssl/certs/etcd-k8s.pem'",
       unless  => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/etcd-k8s/cert/ca | diff -P /etc/etcd/ssl/certs/etcd-k8s.pem -'",
       require => File['/etc/etcd/ssl/certs'],
@@ -96,12 +96,6 @@ class vault_client::config {
     require => File['/etc/etcd/ssl/certs'],
   }
 
-  exec { 'In dev mode get CA for k8s':
-    command => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca > /etc/kubernetes/ssl/certs/k8s.pem'",
-    unless  => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca | diff -P /etc/kubernetes/ssl/certs/k8s.pem -'",
-    require => File['/etc/kubernetes/ssl/certs'],
-  }
-
   #not used for now
   exec { 'update CA trust':
     command     => '/usr/bin/update-ca-trust',
@@ -130,6 +124,12 @@ class vault_client::config {
   }
 
   if $vault_client::role == 'worker' or $vault_client::role == 'master' {
+    exec { 'In dev mode get CA for k8s':
+      command => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca > /etc/kubernetes/ssl/certs/k8s.pem'",
+      unless  => "/bin/bash -c 'source /etc/sysconfig/vault; /usr/bin/vault read -address=\$VAULT_ADDR -field=certificate \$CLUSTER_NAME/pki/k8s/cert/ca | diff -P /etc/kubernetes/ssl/certs/k8s.pem -'",
+      require => File['/etc/kubernetes/ssl/certs'],
+    }
+
     vault_client::k8s_cert_service { 'kubelet':
       k8s_component => 'kubelet',
       frequency     => '1d',
