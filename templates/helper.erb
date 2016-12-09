@@ -1,0 +1,86 @@
+#!/bin/bash
+# vim: set ft=sh sts=4 ts=4 sw=4 et:
+
+set -e
+
+CONFIG_FILE=<%= scope['vault_client::config_path'] %>
+INIT_TOKEN_FILE=<%= scope['vault_client::init_token_path'] %>
+TOKEN_FILE=<%= scope['vault_client::token_path'] %>
+
+function config {
+    source $CONFIG_FILE
+    export VAULT_ADDR
+    if [ ! -f ${TOKEN_FILE} ]; then
+        token_new
+    else
+        VAULT_TOKEN=$(cat ${TOKEN_FILE})
+        export VAULT_TOKEN
+    fi
+}
+
+function token_new {
+    # validate input
+    if [ ! -f ${INIT_TOKEN_FILE} ]; then
+        echo "File ${INIT_TOKEN_FILE} not found" &>2
+        exit 1
+    fi
+    if [ -z "${VAULT_INIT_POLICIES}" ]; then
+        echo "No VAULT_INIT_POLICIES set" &>2
+        exit 1
+    fi
+    if [ -z "${VAULT_INIT_ROLE}" ]; then
+        echo "No VAULT_INIT_ROLE set" &>2
+        exit 1
+    fi
+
+    # parse policies
+    policies=""
+    for policy in $(echo "${VAULT_INIT_POLICIES}" | tr "," "\n"); do
+        policies="${policies}-policy=${policy} "
+    done
+
+    # get initial token
+    VAULT_TOKEN=$(cat ${INIT_TOKEN_FILE})
+    export VAULT_TOKEN
+
+    # renew initial token
+    token_renew
+
+    # get new unique token"
+    TOKEN_OUTPUT=$(vault token-create "${policies}" -role="${VAULT_INIT_ROLE}" -format=json)
+    VAULT_TOKEN=$(echo "${TOKEN_OUTPUT}" | jq -r ".auth.client_token")
+
+    # write token to file
+    echo "${VAULT_TOKEN}" > "${TOKEN_FILE}"
+    chmod 600 ${TOKEN_FILE}
+    export VAULT_TOKEN
+
+    # get rid of init token
+    echo "" > ${INIT_TOKEN_FILE}
+}
+
+function token_renew {
+    vault token-renew -format json > /dev/null
+}
+
+function status {
+    vault token-lookup -format json > /dev/null
+}
+
+case "$1" in
+    status)
+        config
+        status
+        ;;
+    token-renew)
+        config
+        token_renew
+        ;;
+    exec)
+        config
+        shift
+        exec vault "$@"
+        ;;
+    *)
+        echo "Usage: $0 {exec|status|token-renew}"
+esac
