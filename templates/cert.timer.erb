@@ -3,6 +3,7 @@ Description=trigger certificate service <%= @name %>
 
 [Timer]
 OnUnitActiveSec=<%= @frequency %>
+RandomizedDelaySec=<%= @random_delay %>
 Persistent=true
 
 [Install]

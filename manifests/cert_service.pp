@@ -7,6 +7,7 @@ define vault_client::cert_service (
   String $key_type = 'rsa',
   Integer $key_bits = 2048,
   Integer $frequency = 86400,
+  Integer $random_delay = 3600,
   String $user = 'root',
   String $group = 'root',
   Array $exec_post = [],
